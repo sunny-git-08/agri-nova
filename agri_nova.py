@@ -106,7 +106,7 @@ if selected == "Overview":
         fig=go.Figure()
         fig.add_trace(go.Scatter(x=times,y=[62,65,66,72,74,69,67,68],name="Moisture %",mode="lines+markers",line=dict(color="#c7ff5e",width=3),fill="tozeroy",fillcolor="rgba(199,255,94,.07)"))
         fig.add_trace(go.Scatter(x=times,y=[25,26,28,30,29,28,27,28.4],name="Temp °C",mode="lines+markers",line=dict(color="#78c6ff",width=2)))
-        st.plotly_chart(chart_style(fig,280),use_container_width=True)
+        st.plotly_chart(chart_style(fig,280),width="stretch")
         st.caption("Demo trend. Connect the sensor in the Hardware workspace to show real measurements.")
     with right:
         st.markdown('<div class="section-head"><h3>Decision brief</h3><span class="micro">RULE ENGINE</span></div>',unsafe_allow_html=True)
