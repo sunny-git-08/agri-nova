@@ -3,6 +3,7 @@ import random
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from streamlit_mic_recorder import speech_to_text
 
 st.set_page_config(page_title="AGRI//NOVA — Intelligence for Every Acre", page_icon="🌱", layout="wide", initial_sidebar_state="expanded")
 
@@ -69,7 +70,7 @@ with st.sidebar:
     st.caption("YOUR FIELD")
     crop = st.selectbox("Crop", ["Rice", "Cotton", "Chilli", "Maize", "Tomato"])
     soil = st.selectbox("Soil profile", ["Clay", "Red", "Black", "Sandy"])
-    language = st.selectbox("Language", ["English", "Telugu"])
+    language = st.selectbox("Language / భాష", ["English", "Telugu", "Hindi", "Tamil", "Kannada"], key="ui_language")
     st.markdown("---")
     st.markdown('<div class="sidebar-caption">SYSTEM STATUS</div>', unsafe_allow_html=True)
     st.markdown('<span class="dot"></span>WEB APP ONLINE', unsafe_allow_html=True)
@@ -171,7 +172,15 @@ elif selected == "AI Copilot":
     if "chat_history" not in st.session_state: st.session_state.chat_history=[]
     for item in st.session_state.chat_history:
         with st.chat_message(item["role"]): st.markdown(item["content"])
-    prompt=st.chat_input("Ask about watering, yellow leaves, pests or soil...")
+    lang_codes = {"English":"en-IN", "Telugu":"te-IN", "Hindi":"hi-IN", "Tamil":"ta-IN", "Kannada":"kn-IN"}
+    st.caption({"English":"Type a question or use the microphone.", "Telugu":"ప్రశ్న టైప్ చేయండి లేదా మైక్రోఫోన్ ఉపయోగించండి.", "Hindi":"प्रश्न लिखें या माइक्रोफ़ोन का उपयोग करें।", "Tamil":"கேள்வியைத் தட்டச்சு செய்யவும் அல்லது மைக்ரோஃபோனைப் பயன்படுத்தவும்.", "Kannada":"ಪ್ರಶ್ನೆಯನ್ನು ಟೈಪ್ ಮಾಡಿ ಅಥವಾ ಮೈಕ್ರೊಫೋನ್ ಬಳಸಿ."}[language])
+    voice_text = speech_to_text(language=lang_codes[language], start_prompt="🎙️ Speak", stop_prompt="⏹️ Stop", just_once=True, key="voice_input")
+    if voice_text:
+        st.session_state["voice_question"] = voice_text
+    with st.form("copilot_question_form", clear_on_submit=True):
+        typed_prompt = st.text_input("Question", value=st.session_state.pop("voice_question", ""), placeholder="Ask about watering, yellow leaves, pests or soil...")
+        send_question = st.form_submit_button("Send question")
+    prompt = typed_prompt.strip() if send_question else None
     if prompt:
         st.session_state.chat_history.append({"role":"user","content":prompt})
         answer=""
@@ -185,9 +194,26 @@ elif selected == "AI Copilot":
             except Exception as exc: answer="AI connection failed. Verify the API key and model access. "+str(exc)[:160]
         else:
             q=prompt.lower()
-            if "yellow" in q or "pasupu" in q: answer=f"Yellow leaves on {crop} may be caused by excess water, nutrient problems, pests or disease. Check old vs new leaves and inspect both sides. Avoid applying chemicals until the cause is clearer."
-            elif "water" in q or "irrig" in q: answer=f"For {crop} in {soil} soil, check root-zone moisture, crop stage and recent rainfall before watering. This demo cannot see actual field conditions."
-            else: answer=f"To help with your {crop} crop, share its age, visible symptoms and recent watering or rainfall. This is predefined demo guidance, not a live diagnosis."
+            if language == "Telugu":
+                if any(w in q for w in ["yellow", "pasupu", "పసుపు"]): answer=f"మీ {crop} పంటలో ఆకులు పసుపు రంగులోకి మారడానికి అధిక నీరు, పోషకాల లోపం, పురుగులు లేదా వ్యాధి కారణం కావచ్చు. పాత, కొత్త ఆకులను పరిశీలించండి. కారణం స్పష్టమయ్యే వరకు మందులు వాడకండి. ఇది ముందుగా సిద్ధం చేసిన డెమో సూచన మాత్రమే."
+                elif any(w in q for w in ["water", "నీరు", "irrig"]): answer=f"మీ {crop} పంటకు నీరు పెట్టే ముందు వేర్ల దగ్గర నేల తేమ, పంట దశ, ఇటీవలి వర్షాన్ని పరిశీలించండి. ఈ డెమో నిజమైన పొలం పరిస్థితులను చూడలేదు."
+                else: answer=f"మీ {crop} పంట వయస్సు, కనిపిస్తున్న లక్షణాలు, ఇటీవలి నీరు లేదా వర్షం గురించి చెప్పండి. ఇది ముందుగా సిద్ధం చేసిన డెమో సూచన మాత్రమే; ప్రత్యక్ష AI నిర్ధారణ కాదు."
+            elif language == "Hindi":
+                if "yellow" in q or "पीला" in q: answer=f"आपकी {crop} फसल की पीली पत्तियों का कारण अधिक पानी, पोषक तत्वों की कमी, कीट या रोग हो सकता है। पुरानी और नई पत्तियों की जाँच करें। कारण स्पष्ट होने तक रसायन न डालें। यह केवल डेमो सलाह है।"
+                elif "water" in q or "पानी" in q or "irrig" in q: answer=f"{crop} में पानी देने से पहले जड़ों के पास मिट्टी की नमी, फसल की अवस्था और हाल की बारिश जाँचें। यह डेमो वास्तविक खेत की स्थिति नहीं देख सकता।"
+                else: answer=f"अपनी {crop} फसल की उम्र, लक्षण और हाल की सिंचाई या बारिश बताएँ। यह पहले से तैयार डेमो सलाह है, लाइव निदान नहीं।"
+            elif language == "Tamil":
+                if "yellow" in q or "மஞ்சள்" in q: answer=f"உங்கள் {crop} பயிரின் இலைகள் மஞ்சளாக மாறுவதற்கு அதிக நீர், ஊட்டச்சத்து குறைபாடு, பூச்சி அல்லது நோய் காரணமாக இருக்கலாம். பழைய மற்றும் புதிய இலைகளைப் பாருங்கள். காரணம் தெளிவாகும் வரை ரசாயனங்களைப் பயன்படுத்த வேண்டாம். இது டெமோ ஆலோசனை மட்டுமே."
+                elif "water" in q or "நீர்" in q or "irrig" in q: answer=f"{crop} பயிருக்கு நீர் பாய்ச்சுவதற்கு முன் வேர் பகுதி மண் ஈரப்பதம், பயிரின் வளர்ச்சி நிலை மற்றும் சமீபத்திய மழையைச் சரிபார்க்கவும். இது டெமோ மட்டுமே."
+                else: answer=f"உங்கள் {crop} பயிரின் வயது, அறிகுறிகள் மற்றும் சமீபத்திய நீர்ப்பாசனம் அல்லது மழை பற்றி பகிரவும். இது முன்கூட்டியே அமைக்கப்பட்ட டெமோ ஆலோசனை."
+            elif language == "Kannada":
+                if "yellow" in q or "ಹಳದಿ" in q: answer=f"ನಿಮ್ಮ {crop} ಬೆಳೆಯ ಎಲೆಗಳು ಹಳದಿಯಾಗಲು ಹೆಚ್ಚು ನೀರು, ಪೋಷಕಾಂಶಗಳ ಕೊರತೆ, ಕೀಟಗಳು ಅಥವಾ ರೋಗ ಕಾರಣವಾಗಿರಬಹುದು. ಹಳೆಯ ಮತ್ತು ಹೊಸ ಎಲೆಗಳನ್ನು ಪರಿಶೀಲಿಸಿ. ಕಾರಣ ತಿಳಿಯುವವರೆಗೆ ರಾಸಾಯನಿಕಗಳನ್ನು ಬಳಸಬೇಡಿ. ಇದು ಡೆಮೋ ಸಲಹೆ ಮಾತ್ರ."
+                elif "water" in q or "ನೀರು" in q or "irrig" in q: answer=f"{crop} ಬೆಳೆಗೆ ನೀರು ಹಾಕುವ ಮೊದಲು ಬೇರು ಭಾಗದ ಮಣ್ಣಿನ ತೇವಾಂಶ, ಬೆಳೆಯ ಹಂತ ಮತ್ತು ಇತ್ತೀಚಿನ ಮಳೆಯನ್ನು ಪರಿಶೀಲಿಸಿ. ಇದು ನೈಜ ಹೊಲದ ಸ್ಥಿತಿಯನ್ನು ನೋಡುವುದಿಲ್ಲ."
+                else: answer=f"ನಿಮ್ಮ {crop} ಬೆಳೆಯ ವಯಸ್ಸು, ಲಕ್ಷಣಗಳು ಮತ್ತು ಇತ್ತೀಚಿನ ನೀರಾವರಿ ಅಥವಾ ಮಳೆಯ ಬಗ್ಗೆ ತಿಳಿಸಿ. ಇದು ಪೂರ್ವನಿರ್ಧರಿತ ಡೆಮೋ ಸಲಹೆ ಮಾತ್ರ."
+            else:
+                if "yellow" in q or "pasupu" in q: answer=f"Yellow leaves on {crop} may be caused by excess water, nutrient problems, pests or disease. Check old vs new leaves and inspect both sides. Avoid applying chemicals until the cause is clearer. This is predefined demo guidance, not a diagnosis."
+                elif "water" in q or "irrig" in q: answer=f"For {crop} in {soil} soil, check root-zone moisture, crop stage and recent rainfall before watering. This demo cannot see actual field conditions."
+                else: answer=f"To help with your {crop} crop, share its age, visible symptoms and recent watering or rainfall. This is predefined demo guidance, not a live diagnosis."
         st.session_state.chat_history.append({"role":"assistant","content":answer})
         st.rerun()
 
